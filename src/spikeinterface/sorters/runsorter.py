@@ -71,8 +71,8 @@ _common_param_doc = """
         Use a str to specify a non-default container. If that container is not local it will be pulled from docker hub.
         If False, the sorter is run locally.
     singularity_image: bool or str
-        If True, pull the default docker container for the sorter and run the sorter in that container using 
-        singularity. Use a str to specify a non-default container. If that container is not local it will be pulled 
+        If True, pull the default docker container for the sorter and run the sorter in that container using
+        singularity. Use a str to specify a non-default container. If that container is not local it will be pulled
         from Docker Hub.
         If False, the sorter is run locally.
     **sorter_params: keyword args
@@ -96,6 +96,7 @@ def run_sorter(
     docker_image: Optional[Union[bool, str]] = False,
     singularity_image: Optional[Union[bool, str]] = False,
     with_output: bool = True,
+    docker_volumes: dict = {},
     **sorter_params,
 ):
     """
@@ -138,6 +139,7 @@ def run_sorter(
         return run_sorter_container(
             container_image=container_image,
             mode=mode,
+            docker_volumes=docker_volumes,
             **common_kwargs,
         )
 
@@ -339,6 +341,7 @@ def run_sorter_container(
     raise_error: bool = True,
     with_output: bool = True,
     extra_requirements = None,
+    docker_volumes: dict = {},
     **sorter_params,
 ):
     """
@@ -428,15 +431,24 @@ if __name__ == '__main__':
     (parent_folder / 'in_container_sorter_script.py').write_text(py_script, encoding='utf8')
 
     volumes = {}
+    if len(docker_volumes)>0:
+        if verbose:
+            print("Adding user-defined volumes dict:", docker_volumes)
+        volumes.update(docker_volumes)
     for recording_folder, recording_folder_unix in zip(recording_input_folders, recording_input_folders_unix):
         # handle duplicates
         if str(recording_folder) not in volumes:
             volumes[str(recording_folder)] = {
                 'bind': str(recording_folder_unix), 'mode': 'ro'}
     volumes[str(parent_folder)] = {'bind': str(parent_folder_unix), 'mode': 'rw'}
-    
+
+    if verbose:
+        print("#######DEBUG PRINT: `volumes`=")
+        print(volumes)
+        print("### `recording_input_folders`", recording_input_folders)
+        print("#######DEBUG PRINT: END ######")
     si_dev_path = os.getenv('SPIKEINTERFACE_DEV_PATH', None)
-        
+
     install_si_from_source = False
     if 'dev' in si_version and si_dev_path is not None:
         install_si_from_source = True
@@ -446,7 +458,7 @@ if __name__ == '__main__':
         volumes[si_dev_path] = {'bind': si_dev_path_unix, 'mode': 'ro'}
 
     extra_kwargs = {}
-    
+
     use_gpu = SorterClass.use_gpu(sorter_params)
     gpu_capability = SorterClass.gpu_capability
     if use_gpu:
@@ -482,7 +494,7 @@ if __name__ == '__main__':
         print("******")
         print("Container started with the following paths")
         print(si_dev_path_unix, si_source_folder)
-    
+
     # check if container contains spikeinterface already
     cmd_1 = ['python', '-c', 'import spikeinterface; print(spikeinterface.__version__)']
     cmd_2 = ['python', '-c', 'from spikeinterface.sorters import run_sorter_local']
