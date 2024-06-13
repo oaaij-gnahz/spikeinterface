@@ -259,7 +259,8 @@ class NwbRecordingExtractor(BaseRecording):
         else:
             channel_ids = [electrical_series.electrodes.table.id[x] for x in electrodes_indices]
 
-        dtype = electrical_series.data.dtype
+        # dtype = electrical_series.data.dtype # commented by JIAAO
+        dtype = float # added by JIAAO
         BaseRecording.__init__(self, channel_ids=channel_ids, sampling_frequency=sampling_frequency, dtype=dtype)
         num_frames = int(electrical_series.data.shape[0])
         recording_segment = NwbRecordingSegment(
@@ -384,6 +385,11 @@ class NwbRecordingSegment(BaseRecordingSegment):
         self._electrical_series_name = electrical_series_name
         self.electrical_series = retrieve_electrical_series(self._nwbfile, self._electrical_series_name)
         self._num_samples = num_frames
+        ######### JIAAO
+        self.nwb_global_gain = self.electrical_series.conversion if hasattr(self.electrical_series, "conversion") else 1
+        self.nwb_global_offset = self.electrical_series.offset if hasattr(self.electrical_series, "offset") else 0
+        print("NWB gain and offset:", self.nwb_global_gain, self.nwb_global_offset)
+        ######### JIAAO DONE
 
     def get_num_samples(self):
         """Returns the number of samples in this signal block
@@ -413,7 +419,9 @@ class NwbRecordingSegment(BaseRecordingSegment):
                 traces = recordings[:, resorted_indices]
             else:
                 traces = electrical_series_data[start_frame:end_frame, channel_indices]
-
+        # JIAAO correct for gain and offset
+        traces = traces * self.nwb_global_gain + self.nwb_global_offset
+        # end JIAAO
         return traces
 
 
