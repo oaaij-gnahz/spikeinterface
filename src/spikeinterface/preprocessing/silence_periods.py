@@ -111,7 +111,7 @@ class SilencedPeriodsRecordingSegment(BasePreprocessorSegment):
 
                 for period in periods_in_interval:
                     onset = max(0, period[0] - start_frame)
-                    offset = min(period[1] - start_frame, end_frame)
+                    offset = min(period[1] - start_frame, end_frame - start_frame)
 
                     if self.mode == "zeros":
                         traces[onset:offset, :] = 0
