@@ -169,7 +169,7 @@ class RemoveArtifactsRecording(BasePreprocessor):
                 sorting = NumpySorting.from_times_labels(list_triggers, list_labels, recording.get_sampling_frequency())
                 sorting = sorting.save()
                 waveforms_kwargs.update({"ms_before": ms_before, "ms_after": ms_after})
-                w = extract_waveforms(recording, sorting, None, **waveforms_kwargs)
+                w = extract_waveforms(recording, sorting, None, **waveforms_kwargs) # jz edit
 
                 artifacts = {}
                 sparsity = {}
@@ -405,9 +405,13 @@ class RemoveArtifactsRecordingSegment(BasePreprocessorSegment):
                     artifact_slice_values = self.artifacts[label][artifact_slice]
 
                     norm = np.linalg.norm(trace_slice_values) * np.linalg.norm(artifact_slice_values)
-                    best_amplitudes[count] = (
-                        np.dot(trace_slice_values.flatten(), artifact_slice_values.flatten()) / norm
-                    )
+                    # try-except added by Jiaao
+                    try:
+                        best_amplitudes[count] = (
+                            np.dot(trace_slice_values.flatten(), artifact_slice_values.flatten()) / norm
+                        )
+                    except:
+                        best_amplitudes[count] = 0
 
                 if nb_jitters > 0:
                     idx_best_jitter = np.argmax(best_amplitudes)
