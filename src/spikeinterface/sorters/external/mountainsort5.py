@@ -1,14 +1,15 @@
 from pathlib import Path
 from tempfile import tempdir
 from packaging.version import parse
+import os
+import pickle
 
+import numpy as np
 from spikeinterface.preprocessing import bandpass_filter, whiten
-
 from spikeinterface.core.baserecording import BaseRecording
 from ..basesorter import BaseSorter
 from spikeinterface.core.old_api_utils import NewToOldRecording
 from spikeinterface.core import load_extractor
-
 from spikeinterface.extractors import NpzSortingExtractor, NumpySorting
 
 from packaging.version import parse
@@ -38,6 +39,10 @@ class Mountainsort5Sorter(BaseSorter):
         "scheme2_training_duration_sec": 60 * 5,
         "scheme2_training_recording_sampling_mode": "uniform",
         "scheme3_block_duration_sec": 60 * 30,
+        "schemeAa_artifact_winlen_sec": None,
+        "schemeAa_artifact_winmask": None,
+        "schemeAa_training_ratio": None,
+        "schemeAa_max_training_duration_sec": None,
         "freq_min": 300,
         "freq_max": 6000,
         "filter": True,
@@ -61,6 +66,10 @@ class Mountainsort5Sorter(BaseSorter):
         "scheme2_training_duration_sec": "Duration of training data to use in scheme 2",
         "scheme2_training_recording_sampling_mode": "initial or uniform",
         "scheme3_block_duration_sec": "Duration of each block in scheme 3",
+        "schemeAa_artifact_winlen_sec": "Artifact detection window length in second in schemeAa",
+        "schemeAa_artifact_winmask": "Mask indicating whether each window is contaminated in schemeAa",
+        "schemeAa_training_ratio": "Ratio of training data/all clean data in schemeAa",
+        "schemeAa_max_training_duration_sec": "Maximum training duartion in seconds in schemeAa",
         "freq_min": "High-pass filter cutoff frequency",
         "freq_max": "Low-pass filter cutoff frequency",
         "filter": "Enable or disable filter",
@@ -169,6 +178,27 @@ class Mountainsort5Sorter(BaseSorter):
             block_sorting_parameters=scheme2_sorting_parameters, block_duration_sec=p["scheme3_block_duration_sec"]
         )
 
+        schemeAa_sorting_parameters = ms5.SchemeAaSortingParameters(
+            artifact_winlen_sec=p["schemeAa_artifact_winlen_sec"],
+            artifact_winmask=np.array(p["schemeAa_artifact_winmask"]),
+            phase1_detect_channel_radius=p["scheme2_phase1_detect_channel_radius"],
+            detect_channel_radius=p["scheme2_detect_channel_radius"],
+            phase1_detect_threshold=p["detect_threshold"],
+            phase1_detect_time_radius_msec=p["detect_time_radius_msec"],
+            detect_time_radius_msec=p["detect_time_radius_msec"],
+            phase1_npca_per_channel=p["npca_per_channel"],
+            phase1_npca_per_subdivision=p["npca_per_subdivision"],
+            detect_sign=p["detect_sign"],
+            detect_threshold=p["detect_threshold"],
+            snippet_T1=p["snippet_T1"],
+            snippet_T2=p["snippet_T2"],
+            snippet_mask_radius=p["snippet_mask_radius"],
+            max_num_snippets_per_training_batch=p["scheme2_max_num_snippets_per_training_batch"],
+            classifier_npca=None,
+            training_ratio=p["schemeAa_training_ratio"],
+            max_training_duration_sec=p["schemeAa_max_training_duration_sec"]
+        )
+
         scheme = p["scheme"]
         if scheme == "1":
             sorting = ms5.sorting_scheme1(recording=recording, sorting_parameters=scheme1_sorting_parameters)
@@ -176,6 +206,14 @@ class Mountainsort5Sorter(BaseSorter):
             sorting = ms5.sorting_scheme2(recording=recording, sorting_parameters=scheme2_sorting_parameters)
         elif p["scheme"] == "3":
             sorting = ms5.sorting_scheme3(recording=recording, sorting_parameters=scheme3_sorting_parameters)
+        elif p["scheme"] == "Aa":
+            sorting, snippet_clfs = ms5.sorting_scheme_aa(recording=recording, sorting_parameters=schemeAa_sorting_parameters, return_snippet_classifiers=True)
+            print("INFO: SI-MS5 interface: Dumping snippet classifiers to pkl")
+            os.makedirs(str(sorter_output_folder), exist_ok=True)
+            fsc = open(str(sorter_output_folder / "snippet_classfiers.pkl"), "wb")
+            pickle.dump(snippet_clfs, fsc)
+            fsc.close()
+            print("INFO: SI-MS5 interface: Dumped snippet classifiers to pkl")
 
         NpzSortingExtractor.write_sorting(sorting, str(sorter_output_folder / "firings.npz"))
 
