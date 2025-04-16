@@ -116,6 +116,7 @@ def extract_waveforms_to_buffers(
                 shm = arrays_info[unit_id][0]
                 if shm is not None:
                     # empty array have None
+                    shm.close() # jz edit for potentially solving shared mem link
                     shm.unlink()
             return waveforms_by_units
         else:
